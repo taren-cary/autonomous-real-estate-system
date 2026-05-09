@@ -1,0 +1,13 @@
+# Temp reference files at root — content already in skills/
+/listing-writer-skill.md
+/zillow/
+
+# Claude Code local config
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
