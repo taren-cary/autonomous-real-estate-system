@@ -354,14 +354,16 @@ Handled by the Sauma AI Fulfillment Agent running `onboard-client` skill.
 - INSERT into clients table with all IDs and connection references
 
 **Phase 4 — OpenClaw Deployment (Hostinger VPS)**
+- Hostinger one-click OpenClaw runs in Docker — all CLI commands use `docker compose run --rm openclaw-cli`
+- Clone `autonomous-real-estate-system` repo to `~/sauma-ai/` (template store)
 - Create workspace directories for all 5 agents
-- Deploy shared skills (calendar-check, calendar-book, crm-write, crm-read, gmail-send, sms-send, email-check, score-lead, get-listings, zillow)
-- Write SOUL.md, AGENTS.md, HEARTBEAT.md for each agent
-- Register all 5 agents via CLI
+- Copy shared skills from `~/sauma-ai/skills/` and workspace templates from `~/sauma-ai/workspace-templates/`
+- Write AGENTS.md, SOUL.md (via `sed` substitution), HEARTBEAT.md for each agent
+- Register all 5 agents via Docker CLI
 - Bind admin agent to Telegram channel
-- Update openclaw.json: agents, channels, hooks (4 mappings), session prefixes (hook:/sms:/email:), env, agentToAgent, hooks.token, Telegram config
+- Write complete `openclaw.json` in one heredoc: gateway, cron, hooks (4 mappings + session prefixes), all 5 agents, Telegram channel, env vars, agentToAgent
 - Add 4 cron jobs: morning-brief (7am), pipeline-check (noon), mls-scan (8am), email-check (every 5 min)
-- Validate + restart gateway
+- Validate JSON + restart gateway via `docker compose restart`
 
 **Phase 5 — Verify + Telegram Pairing**
 - Health checks (openclaw doctor, agents list, channels, cron)
