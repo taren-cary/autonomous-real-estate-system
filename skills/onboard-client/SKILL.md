@@ -568,6 +568,21 @@ All commands in this phase run on the client's VPS. SSH in first:
 ssh $VPS_USER@$VPS_HOST
 ```
 
+### Step 4-pre — Clone Sauma AI Template Repository
+
+Pull the latest skill and workspace template files from GitHub. This defines the template store for all subsequent steps.
+
+```bash
+# Clone repo on first deployment, or pull latest if already present
+if [ -d ~/sauma-ai ]; then
+  cd ~/sauma-ai && git pull
+else
+  git clone https://github.com/taren-cary/autonomous-real-estate-system ~/sauma-ai
+fi
+```
+
+Confirm `~/sauma-ai/skills/` and `~/sauma-ai/workspace-templates/` exist before continuing.
+
 Then execute each step in order.
 
 ### Step 4a — Create Directory Structure
@@ -582,27 +597,30 @@ mkdir -p ~/.openclaw/$CLIENT_ID/workspace-listings-market/skills/mls-monitor
 mkdir -p ~/.openclaw/$CLIENT_ID/workspace-admin
 ```
 
-### Step 4b — Deploy Shared Skills (once per VPS — skip if already present)
+### Step 4b — Deploy Shared Skills
+
+Copy all shared skills from the cloned GitHub repo. These are available to all agents on this VPS.
 
 ```bash
-ls ~/.openclaw/skills/calendar-check/SKILL.md 2>/dev/null || echo "MISSING"
-```
+REPO=~/sauma-ai
 
-If any shared skill is missing, create it from the Sauma AI template store:
+# Single-file skills
+for SKILL in calendar-check calendar-book score-lead crm-write crm-read gmail-send sms-send email-check get-listings; do
+  mkdir -p ~/.openclaw/skills/$SKILL
+  cp $REPO/skills/$SKILL/SKILL.md ~/.openclaw/skills/$SKILL/
+done
 
-```bash
-mkdir -p ~/.openclaw/skills/calendar-check
-mkdir -p ~/.openclaw/skills/calendar-book
-mkdir -p ~/.openclaw/skills/score-lead
-mkdir -p ~/.openclaw/skills/crm-write
-mkdir -p ~/.openclaw/skills/gmail-send
-mkdir -p ~/.openclaw/skills/get-listings
-mkdir -p ~/.openclaw/skills/sms-send
-mkdir -p ~/.openclaw/skills/crm-read
-mkdir -p ~/.openclaw/skills/email-check
+# Zillow skill (3 files — SKILL.md + reference docs)
 mkdir -p ~/.openclaw/skills/zillow
-# scp or write each SKILL.md (and reference files) from the Sauma AI template directory
-# Note: zillow skill requires 3 files: SKILL.md, investing.md, pricing.md
+cp $REPO/skills/zillow/SKILL.md ~/.openclaw/skills/zillow/
+cp $REPO/skills/zillow/investing.md ~/.openclaw/skills/zillow/
+cp $REPO/skills/zillow/pricing.md ~/.openclaw/skills/zillow/
+
+# Listings & Market workspace-specific skills
+for SKILL in listing-writer cma-research mls-monitor; do
+  mkdir -p ~/.openclaw/$CLIENT_ID/workspace-listings-market/skills/$SKILL
+  cp $REPO/skills/$SKILL/SKILL.md ~/.openclaw/$CLIENT_ID/workspace-listings-market/skills/$SKILL/
+done
 ```
 
 ### Step 4c — Write auth-profiles.json to Every Workspace
@@ -859,7 +877,27 @@ crm-write, crm-read, gmail-send
 
 ### Step 4d-i — Write SOUL.md Files
 
-Copy the SOUL.md template for each agent from the Sauma AI template store, substituting `$CLIENT_NAME` throughout.
+Copy SOUL.md templates from the cloned repo, substituting `$CLIENT_NAME` throughout.
+
+```bash
+REPO=~/sauma-ai
+
+for AGENT in intake showing-coordinator deadline-monitor listings-market admin; do
+  case $AGENT in
+    intake)            WORKSPACE=workspace-intake ;;
+    showing-coordinator) WORKSPACE=workspace-showing-coordinator ;;
+    deadline-monitor)  WORKSPACE=workspace-deadline-monitor ;;
+    listings-market)   WORKSPACE=workspace-listings-market ;;
+    admin)             WORKSPACE=workspace-admin ;;
+  esac
+
+  sed "s/\$CLIENT_NAME/$CLIENT_NAME/g" \
+    $REPO/workspace-templates/$AGENT/SOUL.md \
+    > ~/.openclaw/$CLIENT_ID/$WORKSPACE/SOUL.md
+done
+```
+
+The full SOUL.md content for each agent is below (for reference or manual fallback):
 
 **workspace-intake/SOUL.md**
 ```
