@@ -1069,26 +1069,38 @@ Query the CRM for all active transactions and check every deadline:
 Between 10:00 PM and 7:00 AM, only alert for deadlines within 24 hours.
 ```
 
+### Docker CLI Note
+
+Hostinger's one-click OpenClaw deployment runs inside Docker. All `openclaw` CLI commands must be prefixed with `docker compose run --rm openclaw-cli`. File operations (mkdir, cat, writing config files) work directly on the host — the `~/.openclaw/` directory is bind-mounted into the container. Run all `docker compose` commands from the directory containing `docker-compose.yml` (typically `~` on Hostinger).
+
+```bash
+# Quick reference
+docker compose ps                                        # check gateway is running
+docker compose run --rm openclaw-cli <command>           # run any openclaw CLI command
+docker compose restart                                   # restart gateway after config changes
+docker compose logs --follow                             # tail gateway logs
+```
+
 ### Step 4f — Register All 5 Agents via CLI
 
 ```bash
-openclaw agents add intake-agent-$CLIENT_ID \
+docker compose run --rm openclaw-cli agents add intake-agent-$CLIENT_ID \
   --workspace ~/.openclaw/$CLIENT_ID/workspace-intake \
   --non-interactive
 
-openclaw agents add showing-coordinator-$CLIENT_ID \
+docker compose run --rm openclaw-cli agents add showing-coordinator-$CLIENT_ID \
   --workspace ~/.openclaw/$CLIENT_ID/workspace-showing-coordinator \
   --non-interactive
 
-openclaw agents add deadline-monitor-$CLIENT_ID \
+docker compose run --rm openclaw-cli agents add deadline-monitor-$CLIENT_ID \
   --workspace ~/.openclaw/$CLIENT_ID/workspace-deadline-monitor \
   --non-interactive
 
-openclaw agents add listings-market-$CLIENT_ID \
+docker compose run --rm openclaw-cli agents add listings-market-$CLIENT_ID \
   --workspace ~/.openclaw/$CLIENT_ID/workspace-listings-market \
   --non-interactive
 
-openclaw agents add admin-agent-$CLIENT_ID \
+docker compose run --rm openclaw-cli agents add admin-agent-$CLIENT_ID \
   --workspace ~/.openclaw/$CLIENT_ID/workspace-admin \
   --non-interactive
 ```
@@ -1098,7 +1110,7 @@ openclaw agents add admin-agent-$CLIENT_ID \
 Telegram is configured via openclaw.json (Step 4i) — no separate channel-add command needed. Just bind the admin agent:
 
 ```bash
-openclaw agents bind \
+docker compose run --rm openclaw-cli agents bind \
   --agent admin-agent-$CLIENT_ID \
   --bind telegram
 ```
@@ -1149,9 +1161,9 @@ TZ: "$CLIENT_TIMEZONE"
 
 **Set the hooks secret and session routing (run before restarting gateway):**
 ```bash
-openclaw config set hooks.token "$HOOKS_SECRET_TOKEN"
-openclaw config set hooks.enabled true
-openclaw config set hooks.allowRequestSessionKey true
+docker compose run --rm openclaw-cli config set hooks.token "$HOOKS_SECRET_TOKEN"
+docker compose run --rm openclaw-cli config set hooks.enabled true
+docker compose run --rm openclaw-cli config set hooks.allowRequestSessionKey true
 ```
 
 Also add `"sms:"` and `"email:"` to `hooks.allowedSessionKeyPrefixes` in openclaw.json directly:
@@ -1183,22 +1195,22 @@ This is the security boundary — it controls which agents can participate in ag
 ### Step 4j — Add Cron Jobs
 
 ```bash
-openclaw cron add \
+docker compose run --rm openclaw-cli cron add \
   --name "morning-brief-$CLIENT_ID" \
   --cron "0 7 * * *" \
   --message "Generate the morning briefing for the real estate agent. Include: today's showings and confirmation status, all deadlines this week with urgency level, pipeline summary (hot/warm/cold counts, active transactions), any active escalations from other agents, top 3 action items for today. Deliver via the admin agent's Telegram channel."
 
-openclaw cron add \
+docker compose run --rm openclaw-cli cron add \
   --name "pipeline-check-$CLIENT_ID" \
   --cron "0 12 * * *" \
   --message "Check the pipeline for warm leads that have had no contact in 7+ days. Flag each one to the admin agent with a recommended follow-up action and the number of days since last contact."
 
-openclaw cron add \
+docker compose run --rm openclaw-cli cron add \
   --name "mls-scan-$CLIENT_ID" \
   --cron "0 8 * * *" \
   --message "Run the mls-monitor skill. Scan Zillow for new listings posted in the last 48 hours in the client's market area. Fetch active buyers from CRM using crm-read, match new listings to their criteria, notify matches via gmail-send, log to CRM via crm-write, and report any matches to the admin agent."
 
-openclaw cron add \
+docker compose run --rm openclaw-cli cron add \
   --name "email-check-$CLIENT_ID" \
   --cron "*/5 * * * *" \
   --message "Use the email-check skill to check for new unread emails in the inbox. For each genuine lead inquiry found: reply professionally using gmail-send, log the contact to CRM using crm-write, and begin the qualifying conversation. If no new emails, do nothing."
@@ -1207,12 +1219,12 @@ openclaw cron add \
 ### Step 4k — Validate and Restart Gateway
 
 ```bash
-openclaw config validate
+docker compose run --rm openclaw-cli config validate
 ```
 
 If validation passes:
 ```bash
-openclaw gateway restart
+docker compose restart
 ```
 
 Never restart with a failed validation. If validation fails, fix the JSON error and re-validate before restarting.
@@ -1224,11 +1236,11 @@ Never restart with a failed validation. If validation fails, fix the JSON error 
 Run all health checks. Every check must pass before proceeding to Phase 6.
 
 ```bash
-openclaw doctor
-openclaw agents list --bindings
-openclaw channels status --probe
-openclaw cron list --all
-openclaw gateway status
+docker compose run --rm openclaw-cli doctor
+docker compose run --rm openclaw-cli agents list --bindings
+docker compose run --rm openclaw-cli channels status --probe
+docker compose run --rm openclaw-cli cron list --all
+docker compose ps
 ```
 
 Expected results:
@@ -1237,7 +1249,7 @@ Expected results:
 - 4 cron jobs present: `morning-brief-$CLIENT_ID`, `pipeline-check-$CLIENT_ID`, `mls-scan-$CLIENT_ID`, `email-check-$CLIENT_ID`
 - Gateway running
 
-If anything is unhealthy, run `openclaw doctor --fix --non-interactive`, then re-check. Do not proceed to Phase 6 with any failing checks.
+If anything is unhealthy, run `docker compose run --rm openclaw-cli doctor --fix --non-interactive`, then re-check. Do not proceed to Phase 6 with any failing checks.
 
 ### Step 5b — Pair the Real Estate Agent with Their Telegram Bot
 
@@ -1248,13 +1260,13 @@ Tell the client to open Telegram and send any message to their bot (search for t
 Once the client relays the code:
 
 ```bash
-openclaw pairing approve telegram <CODE>
+docker compose run --rm openclaw-cli pairing approve telegram <CODE>
 ```
 
 Confirm the pairing was accepted:
 
 ```bash
-openclaw pairing list telegram
+docker compose run --rm openclaw-cli pairing list telegram
 ```
 
 The real estate agent can now talk to their Admin Agent via Telegram. This is their primary interface to the entire system.
@@ -1424,7 +1436,7 @@ These must be set in the Supabase project before any edge function will work. Se
 | Phase 2 — Retell LLM | `llm_id` is null | Check API key and payload. Report to CEO agent if unresolvable. |
 | Phase 2 — Retell Agent | `agent_id` is null | Confirm `LLM_ID` is valid. Retry once. |
 | Phase 3 — Supabase | Duplicate key error | Stop. Confirm with CEO agent whether this is a re-onboard before inserting again. |
-| Phase 4 — agents add | Registration fails | Run `openclaw doctor --fix --non-interactive` and retry. Report exact error if it persists. |
+| Phase 4 — agents add | Registration fails | Run `docker compose run --rm openclaw-cli doctor --fix --non-interactive` and retry. Report exact error if it persists. |
 | Phase 4 — config validate | Validation fails | Report the exact JSON error. Fix it. Never restart gateway with a failed validation. |
-| Phase 5 — health check | Agent or channel unhealthy | Run `openclaw doctor --fix`. Check logs with `openclaw logs --follow`. Report if unresolvable. |
+| Phase 5 — health check | Agent or channel unhealthy | Run `docker compose run --rm openclaw-cli doctor --fix`. Check logs with `docker compose logs --follow`. Report if unresolvable. |
 | Phase 6 — OAuth pending | Still PENDING after 48 hours | Resend OAuth URLs to `$CLIENT_EMAIL`. Notify CEO agent. |
