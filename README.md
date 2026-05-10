@@ -71,16 +71,16 @@ Deployed to project **"Autonomous Agents"** (`ydimcpjsscevgjjyrdjp`):
 |---|---|
 | `score-lead` | Scores qualifying answers → hot/warm/cold + routing |
 | `check-availability` | Queries Google Calendar → open showing slots |
-| `book-showing` | Creates calendar event via Maton |
-| `gmail-send` | Sends templated email from agent's Gmail |
-| `crm-write` | Creates/updates GHL contacts, pipeline stages, notes |
-| `crm-read` | Reads GHL contacts, opportunities, pipeline summary |
-| `sms-send` | Sends SMS from client's Twilio number |
+| `book-showing` | Creates, cancels, or reschedules calendar events via Maton |
+| `gmail-send` | Sends templated email; supports reply threading (In-Reply-To/References) |
+| `crm-write` | Creates contacts (with dedup), updates pipeline stages, logs notes |
+| `crm-read` | get_contact / get_contact_by_id / list_contacts (returns phone) / pipeline_summary |
+| `sms-send` | Sends SMS from client's Twilio number via Twilio Messages API |
 | `get-listings` | Reads client's Google Sheet listing inventory |
-| `check-email` | Polls Gmail inbox → routes new emails to OpenClaw |
+| `check-email` | Polls Gmail → returns thread_id + rfc_message_id; routes to per-sender sessions |
 | `trigger-outbound-call` | Fires Retell outbound call from web/Zillow webhook |
-| `handle-call-ended` | Bridges Retell call_analyzed → OpenClaw |
-| `handle-inbound-sms` | Routes Twilio SMS → OpenClaw with per-lead session |
+| `handle-call-ended` | Bridges Retell call_analyzed → OpenClaw with sessionKey + calendar_event_id |
+| `handle-inbound-sms` | Routes Twilio SMS → OpenClaw with sessionKey in request body (per-lead session) |
 
 ---
 

@@ -1,5 +1,5 @@
 # Sauma AI — Autonomous Real Estate AI System
-**Version:** 3.0
+**Version:** 3.1
 **Last Updated:** May 2026
 **Platform:** OpenClaw + Retell AI + Supabase + Maton + GoHighLevel + Twilio + Telegram
 
@@ -141,8 +141,12 @@ Agent (voice)       │               Agent (text)         Agent (voice)
 | `book_showing` | Creates calendar event, confirms verbally |
 | `get_listings` | Searches client's Google Sheet for matching active listings |
 
+**Retell does NOT write to CRM or send emails during the call.** All post-call work is handled by OpenClaw via the `handle-call-ended` bridge.
+
+**Inbound agent — cancel/reschedule:** When a caller wants to cancel or reschedule, the agent acknowledges warmly, collects the preferred new time if rescheduling, and tells the caller they'll receive a text confirmation shortly. OpenClaw handles the actual calendar update post-call via SMS.
+
 #### Post-Call Analysis
-Both agents configured with `post_call_analysis_data` (12 fields) and `webhook_events: ["call_analyzed"]`. Extracts: `call_summary`, `call_successful`, `user_sentiment`, `intent`, `timeline`, `budget`, `pre_approved`, `areas`, `working_with_agent`, `showing_booked`, `lead_email`, `lead_name`.
+Both agents configured with `post_call_analysis_data` (13 fields) and `webhook_events: ["call_analyzed"]`. Extracts: `call_summary`, `call_successful`, `user_sentiment`, `intent`, `timeline`, `budget`, `pre_approved`, `areas`, `working_with_agent`, `showing_booked`, `calendar_event_id`, `lead_email`, `lead_name`.
 
 ---
 
@@ -184,16 +188,16 @@ All external integrations go through Supabase Edge Functions. Client credentials
 |---|---|---|
 | `score-lead` | Retell + OpenClaw | Score qualifying answers → tier + routing |
 | `check-availability` | Retell + OpenClaw | Query Google Calendar freeBusy → open slots |
-| `book-showing` | Retell + OpenClaw | Create calendar event via Maton |
-| `crm-write` | OpenClaw only | create_contact / update_stage / log_interaction in GHL |
-| `crm-read` | OpenClaw only | get_contact / list_contacts / pipeline_summary from GHL |
-| `gmail-send` | OpenClaw only | Send templated email from agent's Gmail |
-| `sms-send` | OpenClaw only | Send SMS from agent's Twilio number via Twilio API |
+| `book-showing` | Retell + OpenClaw | Create, cancel, or reschedule calendar events via Maton |
+| `crm-write` | OpenClaw only | create_contact (with dedup) / update_stage / log_interaction in GHL |
+| `crm-read` | OpenClaw only | get_contact / get_contact_by_id / list_contacts (with phone) / pipeline_summary |
+| `gmail-send` | OpenClaw only | Send templated email; supports reply threading via thread_id + In-Reply-To headers |
+| `sms-send` | OpenClaw only | Send SMS from agent's Twilio number via Twilio Messages API |
 | `get-listings` | Retell + OpenClaw | Read Google Sheet → return filtered active listings |
-| `check-email` | OpenClaw (cron) | Poll Gmail inbox → forward new emails to OpenClaw hooks |
+| `check-email` | OpenClaw (cron) | Poll Gmail → return thread_id + rfc_message_id; forward to OpenClaw per-sender sessions |
 | `trigger-outbound-call` | Web/Zillow webhooks | Initiate outbound Retell call to lead |
-| `handle-call-ended` | Retell webhook | Bridge call_analyzed data → OpenClaw |
-| `handle-inbound-sms` | Twilio SMS webhook | Route inbound SMS → OpenClaw with per-lead session |
+| `handle-call-ended` | Retell webhook | Bridge call_analyzed data → OpenClaw with sessionKey in body + calendar_event_id |
+| `handle-inbound-sms` | Twilio SMS webhook | Route inbound SMS → OpenClaw with sessionKey in request body (per-lead session) |
 
 ---
 
