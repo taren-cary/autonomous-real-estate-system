@@ -432,6 +432,7 @@ POST_CALL_ANALYSIS='[
   {"type":"string","name":"areas","description":"Target neighborhoods or cities, comma-separated","required":false},
   {"type":"boolean","name":"working_with_agent","description":"Whether the lead is working with another agent","required":false},
   {"type":"boolean","name":"showing_booked","description":"Whether a showing was successfully booked during this call","required":true},
+  {"type":"string","name":"calendar_event_id","description":"The Google Calendar event ID returned by the book_showing tool. Extract from the tool call response in the transcript if a showing was booked.","required":false},
   {"type":"string","name":"lead_email","description":"Lead email address if provided during the call","required":false},
   {"type":"string","name":"lead_name","description":"Lead full name as stated during the call","required":false}
 ]'
@@ -651,10 +652,11 @@ A Retell voice call just ended and Retell's post-call analysis is complete. The 
 Your responsibilities for every call (inbound or outbound):
 
 1. **Create or update the CRM contact** via crm-write:
-   - Use `create_contact` if the lead is new (use lead_phone to check first)
+   - Use `create_contact` — deduplication is automatic (searches by phone before creating)
    - Include: intent, timeline, budget, pre_approved, areas, working_with_agent if present
    - Log the call_summary as a note, then the full transcript as a second note
    - Update pipeline_stage based on showing_booked and call_successful
+   - **If showing_booked is true and calendar_event_id is present:** log it in a parseable format: `SHOWING_BOOKED | CALENDAR_EVENT_ID: {calendar_event_id} | Property: {property} | DateTime: {datetime}` — this is how the Showing Coordinator retrieves it for reschedule/cancel
 
 2. **Send confirmation** if a showing was booked (showing_booked = true):
    - gmail-send with template `showing_confirmation` if lead_email is present
@@ -721,8 +723,22 @@ How to send (fire-and-forget):
 Use sessions_send targeting `agent:admin-agent-$CLIENT_ID:main` with timeoutSeconds: 0.
 Always include: showing date/time, property address, the unresolved issue, and what you already attempted.
 
+## Rescheduling a Showing
+If a party needs to reschedule:
+1. Use crm-read (get_contact by phone) → search notes for `CALENDAR_EVENT_ID:` to get the event_id
+2. Call calendar-check to find alternative available times
+3. Confirm new time with all parties
+4. Use calendar-book (operation: reschedule) with the event_id and new_datetime
+5. Use crm-write (log_interaction) to update the CRM note with the new time
+
+If a showing must be cancelled:
+1. Get the event_id from CRM notes (same as above)
+2. Use calendar-book (operation: cancel) with the event_id
+3. Use crm-write (update_stage) to move lead back to `qualified`
+4. Report to admin agent immediately
+
 ## Skills Available
-calendar-check, crm-write, crm-read, gmail-send, sms-send
+calendar-check, calendar-book, crm-write, crm-read, gmail-send, sms-send
 ```
 
 **workspace-deadline-monitor/AGENTS.md**
