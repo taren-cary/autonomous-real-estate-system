@@ -22,7 +22,8 @@ Reads from the client's GoHighLevel CRM via the crm-read Edge Function. Three op
 | Agent | Use case | Operation |
 |---|---|---|
 | Intake | Look up an existing lead by phone before creating a duplicate | `get_contact` |
-| Showing Coordinator | Check which leads have upcoming showings | `list_contacts` with `showing_scheduled` stage |
+| Showing Coordinator | Check which leads have upcoming showings (returns phone for sms-send) | `list_contacts` with `showing_scheduled` stage |
+| Showing Coordinator | Get full contact details including phone by GHL contact ID | `get_contact_by_id` |
 | Deadline Monitor | Find all active transactions to check deadlines | `list_contacts` with `under_contract` or `active_buyer` stage |
 | Listings & Market | Get active buyers and their criteria for MLS matching | `list_contacts` with `active_buyer` stage |
 | Admin | Get pipeline counts for morning briefing | `pipeline_summary` |
@@ -31,7 +32,7 @@ Reads from the client's GoHighLevel CRM via the crm-read Edge Function. Three op
 
 ## Operations
 
-### get_contact — look up a single contact by phone
+### get_contact — look up a single contact by phone number
 
 ```bash
 curl -s -X POST "$SUPABASE_URL/functions/v1/crm-read" \
@@ -45,6 +46,25 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/crm-read" \
 ```
 
 Returns: `{ contact: { id, firstName, lastName, email, phone, tags, notes: [...] } }` or `{ contact: null }` if not found.
+
+---
+
+### get_contact_by_id — look up a single contact by their GHL contact ID
+
+Use this when you have a `contact_id` from `list_contacts` and need the full contact including phone.
+
+```bash
+curl -s -X POST "$SUPABASE_URL/functions/v1/crm-read" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"agent_id\": \"$AGENT_ID\",
+    \"operation\": \"get_contact_by_id\",
+    \"filters\": { \"contact_id\": \"ghl-contact-id-here\" }
+  }"
+```
+
+Returns: `{ contact: { id, firstName, lastName, email, phone, tags, notes: [...] } }` or `{ contact: null }`.
 
 ---
 

@@ -39,6 +39,7 @@ Sends a templated email from the real estate agent's connected Gmail account via
 
 2. POST to the gmail-send Edge Function:
 
+**New email thread:**
 ```bash
 curl -s -X POST "$SUPABASE_URL/functions/v1/gmail-send" \
   -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
@@ -55,6 +56,26 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/gmail-send" \
     }
   }"
 ```
+
+**Reply to an existing email (always do this when responding to an inbound email):**
+
+Use `thread_id` and `rfc_message_id` from the `check-email` / `email-check` hook payload to keep the conversation in one thread:
+
+```bash
+curl -s -X POST "$SUPABASE_URL/functions/v1/gmail-send" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"agent_id\": \"$AGENT_ID\",
+    \"template\": \"follow_up_warm\",
+    \"to\": \"<lead_email>\",
+    \"variables\": { \"lead_name\": \"<name>\", \"agent_name\": \"<agent_name>\" },
+    \"thread_id\": \"<thread_id from email hook>\",
+    \"reply_to_message_id\": \"<rfc_message_id from email hook>\"
+  }"
+```
+
+`thread_id` groups the reply in the agent's Gmail. `reply_to_message_id` sets `In-Reply-To` and `References` headers so the lead sees it as a reply in their inbox.
 
 3. On success (`"sent": true`): no further action needed — confirmation is sent.
 
