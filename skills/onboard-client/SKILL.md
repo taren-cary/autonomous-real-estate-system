@@ -7,7 +7,7 @@ metadata: {
     "emoji": "🚀",
     "requires": {
       "bins": ["curl", "jq", "ssh"],
-      "env": ["MATON_API_KEY", "RETELL_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"]
+      "env": ["MATON_API_KEY", "RETELL_API_KEY", "CLIENT_SUPABASE_URL", "CLIENT_SUPABASE_SERVICE_KEY", "CLIENT_SUPABASE_ANON_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"]
     }
   }
 }
@@ -124,7 +124,7 @@ Confirm `SHEETS_CONNECTION_ID` is non-empty. This connection stays PENDING until
 
 ### Step 2a — Create the Retell LLM
 
-This single call creates the LLM with all four intake Edge Functions wired in. Replace `CLIENT_ID`, `CLIENT_NAME`, and `SUPABASE_ANON_KEY` with actual values before executing.
+This single call creates the LLM with all four intake Edge Functions wired in. Replace `CLIENT_ID`, `CLIENT_NAME`, `CLIENT_COMPANY`, and `CLIENT_SUPABASE_ANON_KEY` with actual values before executing.
 
 ```bash
 LLM_RESP=$(curl -s -X POST "https://api.retellai.com/create-retell-llm" \
@@ -151,7 +151,7 @@ LLM_RESP=$(curl -s -X POST "https://api.retellai.com/create-retell-llm" \
         \"description\": \"Score the lead after collecting all 6 qualifying answers. Call once all questions are answered.\",
         \"url\": \"https://ydimcpjsscevgjjyrdjp.supabase.co/functions/v1/score-lead\",
         \"method\": \"POST\",
-        \"headers\": { \"Authorization\": \"Bearer $SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
+        \"headers\": { \"Authorization\": \"Bearer $CLIENT_SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
         \"parameters\": {
           \"type\": \"object\",
           \"properties\": {
@@ -182,7 +182,7 @@ LLM_RESP=$(curl -s -X POST "https://api.retellai.com/create-retell-llm" \
         \"description\": \"Check the agent's Google Calendar for open 1-hour showing slots. Call after score_lead returns routing: book_showing.\",
         \"url\": \"https://ydimcpjsscevgjjyrdjp.supabase.co/functions/v1/check-availability\",
         \"method\": \"POST\",
-        \"headers\": { \"Authorization\": \"Bearer $SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
+        \"headers\": { \"Authorization\": \"Bearer $CLIENT_SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
         \"parameters\": {
           \"type\": \"object\",
           \"properties\": {
@@ -209,7 +209,7 @@ LLM_RESP=$(curl -s -X POST "https://api.retellai.com/create-retell-llm" \
         \"description\": \"Book a 1-hour property showing on the agent's calendar. Call only after the lead confirms a specific time from check_availability results.\",
         \"url\": \"https://ydimcpjsscevgjjyrdjp.supabase.co/functions/v1/book-showing\",
         \"method\": \"POST\",
-        \"headers\": { \"Authorization\": \"Bearer $SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
+        \"headers\": { \"Authorization\": \"Bearer $CLIENT_SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
         \"parameters\": {
           \"type\": \"object\",
           \"properties\": {
@@ -233,7 +233,7 @@ LLM_RESP=$(curl -s -X POST "https://api.retellai.com/create-retell-llm" \
         \"description\": \"Search current property listings. Call when a lead asks about available properties, specific listings, or properties matching their criteria.\",
         \"url\": \"https://ydimcpjsscevgjjyrdjp.supabase.co/functions/v1/get-listings\",
         \"method\": \"POST\",
-        \"headers\": { \"Authorization\": \"Bearer $SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
+        \"headers\": { \"Authorization\": \"Bearer $CLIENT_SUPABASE_ANON_KEY\", \"Content-Type\": \"application/json\" },
         \"parameters\": {
           \"type\": \"object\",
           \"properties\": {
@@ -538,9 +538,9 @@ After this step the full voice path is live:
 All external IDs are now collected. Insert the client row.
 
 ```bash
-curl -s -X POST "$SUPABASE_URL/rest/v1/clients" \
-  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+curl -s -X POST "$CLIENT_SUPABASE_URL/rest/v1/clients" \
+  -H "Authorization: Bearer $CLIENT_SUPABASE_SERVICE_KEY" \
+  -H "apikey: $CLIENT_SUPABASE_SERVICE_KEY" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
   -d "{
@@ -1168,7 +1168,7 @@ This makes the Admin Agent the destination for all Telegram DMs to the bot. The 
 
 Write the entire config in one shot. This replaces Hostinger's default config cleanly — no appending, no fragile JSON merging.
 
-> **Prerequisite:** `SUPABASE_URL` and `SUPABASE_ANON_KEY` must be set as environment variables on the Sauma AI fulfillment agent's machine — they are the same across all client deployments (Sauma AI constants). Add them to `~/.bashrc` or your shell profile if not already present.
+> **Prerequisite:** `CLIENT_SUPABASE_URL`, `CLIENT_SUPABASE_ANON_KEY`, and `CLIENT_SUPABASE_SERVICE_KEY` must be set as environment variables on the Sauma AI fulfillment agent's machine — they point to the autonomous-real-estate-system Supabase project and are the same for every client deployment. Add them to `~/.bashrc` or your shell profile if not already present.
 
 ```bash
 # Read gateway token auto-generated by Hostinger (used for the Control UI dashboard)
@@ -1253,8 +1253,8 @@ cat > $HOME/.openclaw/openclaw.json << EOF
     "vars": {
       "AGENT_ID": "$CLIENT_ID",
       "TZ": "$CLIENT_TIMEZONE",
-      "SUPABASE_URL": "$SUPABASE_URL",
-      "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY"
+      "SUPABASE_URL": "$CLIENT_SUPABASE_URL",
+      "SUPABASE_ANON_KEY": "$CLIENT_SUPABASE_ANON_KEY"
     },
     "shellEnv": true
   },
@@ -1446,9 +1446,9 @@ GHL_PIPELINE_RESP=$(curl -s \
 GHL_PIPELINE_ID=$(echo $GHL_PIPELINE_RESP | jq -r '.pipelines[0].id')
 
 # Update the clients row with the pipeline ID
-curl -s -X PATCH "$SUPABASE_URL/rest/v1/clients?agent_id=eq.$CLIENT_ID" \
-  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+curl -s -X PATCH "$CLIENT_SUPABASE_URL/rest/v1/clients?agent_id=eq.$CLIENT_ID" \
+  -H "Authorization: Bearer $CLIENT_SUPABASE_SERVICE_KEY" \
+  -H "apikey: $CLIENT_SUPABASE_SERVICE_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"ghl_pipeline_id\": \"$GHL_PIPELINE_ID\"}"
 ```
