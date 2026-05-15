@@ -1340,20 +1340,27 @@ If anything is unhealthy, run `docker compose run --rm openclaw-cli doctor --fix
 
 ### Step 5b — Pair the Real Estate Agent with Their Telegram Bot
 
-⚠️ Pairing codes expire in 1 hour — complete this step immediately after the gateway is healthy.
-
-Tell the client to open Telegram and send any message to their bot (search for the bot username from @BotFather). The bot will reply with a pairing code.
-
-Once the client relays the code:
+The activation email (Phase 6) already instructs the client to DM their bot. The pairing code is visible server-side — no need for the client to relay it. Poll until the pairing request appears, then approve automatically.
 
 ```bash
-docker compose run --rm openclaw-cli pairing approve telegram <CODE>
-```
+# Wait for the client to DM the bot (polls every 5 seconds, timeout 10 minutes)
+echo "Waiting for client to DM their Telegram bot..."
+ATTEMPTS=0
+until docker compose run --rm openclaw-cli pairing list telegram 2>/dev/null | grep -q "pending"; do
+  sleep 5
+  ATTEMPTS=$((ATTEMPTS + 1))
+  if [ $ATTEMPTS -ge 120 ]; then
+    echo "Timeout — client has not DM'd the bot yet. Re-send activation email if needed."
+    exit 1
+  fi
+done
 
-Confirm the pairing was accepted:
+# Approve the pending pairing
+docker compose run --rm openclaw-cli pairing approve telegram $(
+  docker compose run --rm openclaw-cli pairing list telegram 2>/dev/null | grep "pending" | awk '{print $1}'
+)
 
-```bash
-docker compose run --rm openclaw-cli pairing list telegram
+echo "✓ Telegram pairing complete — client can now message their Admin Agent"
 ```
 
 The real estate agent can now talk to their Admin Agent via Telegram. This is their primary interface to the entire system.
@@ -1365,11 +1372,12 @@ The real estate agent can now talk to their Admin Agent via Telegram. This is th
 Email all four connection links to `$CLIENT_EMAIL`. Google Calendar, Gmail, and Sheets require OAuth (click and sign in). GoHighLevel requires manually entering a Private Integration Token.
 
 ```
-Subject: Your AI real estate assistant is almost live — 4 quick steps needed
+Subject: Your AI real estate assistant is almost live — action required
 
 Hi $CLIENT_NAME,
 
-Your autonomous real estate AI system is fully deployed. Complete all four steps below to activate it.
+Your autonomous real estate AI system is fully deployed and ready to activate.
+Please complete the steps below and reply to the question at the bottom.
 
 ━━ STEPS 1, 2 & 3: Google Access ━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1384,17 +1392,18 @@ Click each link and sign into your Google account:
 3. Google Sheets (required for listing search during calls):
    $SHEETS_OAUTH_URL
 
-   After authorizing, make sure your listings Google Sheet is set up with
-   these columns in row 1: Address | Price | Status | Bedrooms | Bathrooms |
-   Sq Ft | HOA Fee | Top 3 Features | School District
+   After authorizing, please ensure your listings Google Sheet has these
+   column headers in row 1:
+   Address | Price | Status | Bedrooms | Bathrooms | Sq Ft | HOA Fee |
+   Top 3 Features | School District
    Your sheet ID: $CLIENT_LISTING_SHEET_ID
 
 ━━ STEP 4: GoHighLevel CRM Connection ━━━━━━━━━━━━━━━━━━━━
 
-This connects your AI system to your GoHighLevel account so it can
-manage leads, update your pipeline, and log every interaction automatically.
+This connects your AI system to your GoHighLevel account so it can manage
+leads, update your pipeline, and log every interaction automatically.
 
-First, find your Private Integration Token in GoHighLevel:
+Find your Private Integration Token in GoHighLevel:
    a) Log into your GoHighLevel account
    b) Click Settings (gear icon, bottom left)
    c) Click "Integrations"
@@ -1402,16 +1411,72 @@ First, find your Private Integration Token in GoHighLevel:
    e) Click "Add New" if you don't have one — name it "Sauma AI"
    f) Copy the token
 
-Then open this link and paste the token when prompted:
+Then open this link and paste your token when prompted:
    $GHL_CONNECTION_URL
+
+━━ ALSO: Activate Your Telegram Command Interface ━━━━━━━━
+
+Once the steps above are complete, open Telegram and send any message to
+your bot (@$TELEGRAM_BOT_USERNAME). This activates your Admin Agent —
+your direct line to the entire AI system for briefings, updates, and commands.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Once all four are complete, your system goes live immediately.
+━━ YOUR DEDICATED AI PHONE NUMBER ━━━━━━━━━━━━━━━━━━━━━━━━
 
-Questions? Reply to this email.
+Your system has been assigned a dedicated phone number:
 
-— Sauma AI
+   $TWILIO_NUMBER
+
+This is your AI-powered lead line. Every inbound call is handled
+immediately by your AI agent — qualifying leads, answering listing
+questions, and booking showings around the clock. When a lead submits
+a form on your website or Zillow, your AI will call them back from this
+number within seconds.
+
+You have two options for using this number:
+
+   Option A — Use it as your lead number
+   Publish $TWILIO_NUMBER on your website, Zillow profile, and marketing
+   materials as the contact number for leads. All lead calls go directly
+   to your AI agent.
+
+   Option B — Forward your existing number to it
+   Keep your current business number and configure call forwarding to
+   $TWILIO_NUMBER. Leads continue calling the number they know, and your
+   AI handles every call from there.
+
+Either option works — the outbound calling system will always use
+$TWILIO_NUMBER to reach leads automatically.
+
+━━ ONE QUESTION: WEBSITE & ZILLOW WEBHOOK SETUP ━━━━━━━━━━
+
+To enable instant outbound callbacks when leads submit a form on your
+website or Zillow, a webhook needs to be configured on those platforms.
+This is what allows your AI to call a lead back within seconds of them
+expressing interest.
+
+Who would you like to handle this setup?
+
+   □  My developer will handle it
+      Reply with this option and we will send them the technical
+      specifications needed to configure the webhook.
+
+   □  I'd like Sauma AI to handle it
+      Reply with this option and our team will take care of the
+      full setup on your behalf.
+
+Please reply to this email with your preference at your earliest
+convenience so we can get this final piece activated.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Once the four authorization steps above are complete and the webhook is
+configured, your system is fully live.
+
+Questions? Reply to this email — we're here to help.
+
+— The Sauma AI Team
 ```
 
 ### Poll all four connections
