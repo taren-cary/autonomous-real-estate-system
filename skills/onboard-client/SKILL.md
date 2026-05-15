@@ -85,16 +85,19 @@ GMAIL_OAUTH_URL=$(echo $GMAIL_RESP | jq -r '.connection.url')
 
 Confirm both `MATON_CONNECTION_ID` and `GMAIL_CONNECTION_ID` are non-empty before continuing. If either is empty, stop and report to CEO agent.
 
-### GoHighLevel CRM
+### HubSpot CRM (default)
 
 ```bash
-GHL_RESP=$(curl -s -X POST "https://api.maton.ai/connections" \
+HUBSPOT_RESP=$(curl -s -X POST "https://api.maton.ai/connections" \
   -H "Authorization: Bearer $MATON_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"app": "highlevel-pit"}')
+  -d '{"app": "hubspot"}')
 
-GHL_CONNECTION_ID=$(echo $GHL_RESP | jq -r '.connection.connection_id')
-GHL_CONNECTION_URL=$(echo $GHL_RESP | jq -r '.connection.url')
+HUBSPOT_CONNECTION_ID=$(echo $HUBSPOT_RESP | jq -r '.connection.connection_id')
+HUBSPOT_OAUTH_URL=$(echo $HUBSPOT_RESP | jq -r '.connection.url')
+```
+
+> **Client already has GoHighLevel?** See `GHL CRM Implementation Guide.md` — replace this block with the GHL connection and follow the guide for all other differences.
 ```
 
 Confirm `GHL_CONNECTION_ID` is non-empty. This connection stays PENDING until the client enters their Private Integration Token — that step is in Phase 6.
@@ -551,8 +554,7 @@ curl -s -X POST "$CLIENT_SUPABASE_URL/rest/v1/clients" \
     \"timezone\": \"$CLIENT_TIMEZONE\",
     \"maton_connection_id\": \"$MATON_CONNECTION_ID\",
     \"gmail_connection_id\": \"$GMAIL_CONNECTION_ID\",
-    \"ghl_connection_id\": \"$GHL_CONNECTION_ID\",
-    \"ghl_location_id\": \"$CLIENT_GHL_LOCATION_ID\",
+    \"hubspot_connection_id\": \"$HUBSPOT_CONNECTION_ID\",
     \"retell_agent_id\": \"$RETELL_OUTBOUND_AGENT_ID\",
     \"retell_inbound_agent_id\": \"$RETELL_INBOUND_AGENT_ID\",
     \"twilio_number\": \"$TWILIO_NUMBER\",
@@ -1398,27 +1400,21 @@ Click each link and sign into your Google account:
    Top 3 Features | School District
    Your sheet ID: $CLIENT_LISTING_SHEET_ID
 
-━━ STEP 4: GoHighLevel CRM Connection ━━━━━━━━━━━━━━━━━━━━
+━━ STEP 4: HubSpot CRM Connection ━━━━━━━━━━━━━━━━━━━━━━━━
 
-This connects your AI system to your GoHighLevel account so it can manage
-leads, update your pipeline, and log every interaction automatically.
+This connects your AI system to HubSpot so it can manage leads, track your
+pipeline, and log every interaction automatically. HubSpot is free to use.
 
-Find your Private Integration Token in GoHighLevel:
-   a) Log into your GoHighLevel account
-   b) Click Settings (gear icon, bottom left)
-   c) Click "Integrations"
-   d) Under "Private Integrations", click "Private Integration Tokens"
-   e) Click "Add New" if you don't have one — name it "Sauma AI"
-   f) Copy the token
+Click the link below and sign into your HubSpot account:
+   $HUBSPOT_OAUTH_URL
 
-Then open this link and paste your token when prompted:
-   $GHL_CONNECTION_URL
+If you don't have a HubSpot account yet, you can create one free at
+hubspot.com — no credit card required.
 
 ━━ ALSO: Activate Your Telegram Command Interface ━━━━━━━━
 
 Once the steps above are complete, open Telegram and send any message to
-your bot (@$TELEGRAM_BOT_USERNAME). This activates your Admin Agent —
-your direct line to the entire AI system for briefings, updates, and commands.
+your bot. This activates your Admin Agent — your direct line to the entire AI system for briefings, updates, and commands.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1481,46 +1477,46 @@ Questions? Reply to this email — we're here to help.
 
 ### Poll all four connections
 
-Poll each connection until ACTIVE. GHL is typically fast (synchronous PIT entry). Google OAuth may take a few minutes.
+Poll each connection until ACTIVE. All four are OAuth — may take a few minutes after the client authorizes.
 
 ```bash
-# Check all four statuses
-curl -s "https://api.maton.ai/connections/$MATON_CONNECTION_ID" \
-  -H "Authorization: Bearer $MATON_API_KEY" | jq -r '.connection.status'
-
-curl -s "https://api.maton.ai/connections/$GMAIL_CONNECTION_ID" \
-  -H "Authorization: Bearer $MATON_API_KEY" | jq -r '.connection.status'
-
-curl -s "https://api.maton.ai/connections/$GHL_CONNECTION_ID" \
-  -H "Authorization: Bearer $MATON_API_KEY" | jq -r '.connection.status'
-
-curl -s "https://api.maton.ai/connections/$SHEETS_CONNECTION_ID" \
-  -H "Authorization: Bearer $MATON_API_KEY" | jq -r '.connection.status'
+for CONN_ID in "$MATON_CONNECTION_ID" "$GMAIL_CONNECTION_ID" "$HUBSPOT_CONNECTION_ID" "$SHEETS_CONNECTION_ID"; do
+  curl -s "https://api.maton.ai/connections/$CONN_ID" \
+    -H "Authorization: Bearer $MATON_API_KEY" | jq -r '.connection.status'
+done
 ```
 
-### Once GHL connection is ACTIVE — fetch and store pipeline ID
+### Once HubSpot connection is ACTIVE — create the real_estate_stage property
 
-Do this immediately when GHL flips ACTIVE, before the Google connections are done.
+Run this once after HubSpot goes ACTIVE. This creates the custom contact property used to track pipeline stage.
 
 ```bash
-GHL_PIPELINE_RESP=$(curl -s \
-  "https://api.maton.ai/highlevel-pit/opportunities/pipelines?locationId=$CLIENT_GHL_LOCATION_ID" \
+curl -s -X POST "https://api.maton.ai/hubspot/crm/v3/properties/contacts" \
   -H "Authorization: Bearer $MATON_API_KEY" \
-  -H "Maton-Connection: $GHL_CONNECTION_ID")
-
-GHL_PIPELINE_ID=$(echo $GHL_PIPELINE_RESP | jq -r '.pipelines[0].id')
-
-# Update the clients row with the pipeline ID
-curl -s -X PATCH "$CLIENT_SUPABASE_URL/rest/v1/clients?agent_id=eq.$CLIENT_ID" \
-  -H "Authorization: Bearer $CLIENT_SUPABASE_SERVICE_KEY" \
-  -H "apikey: $CLIENT_SUPABASE_SERVICE_KEY" \
+  -H "Maton-Connection: $HUBSPOT_CONNECTION_ID" \
   -H "Content-Type: application/json" \
-  -d "{\"ghl_pipeline_id\": \"$GHL_PIPELINE_ID\"}"
+  -d '{
+    "name": "real_estate_stage",
+    "label": "Real Estate Stage",
+    "type": "enumeration",
+    "fieldType": "select",
+    "groupName": "contactinformation",
+    "options": [
+      { "label": "New Lead", "value": "new_lead", "displayOrder": 0 },
+      { "label": "Qualified", "value": "qualified", "displayOrder": 1 },
+      { "label": "Showing Scheduled", "value": "showing_scheduled", "displayOrder": 2 },
+      { "label": "Showing Complete", "value": "showing_complete", "displayOrder": 3 },
+      { "label": "Active Buyer/Seller", "value": "active_buyer", "displayOrder": 4 },
+      { "label": "Under Contract", "value": "under_contract", "displayOrder": 5 },
+      { "label": "Closed", "value": "closed", "displayOrder": 6 },
+      { "label": "Drip", "value": "drip", "displayOrder": 7 }
+    ]
+  }'
 ```
 
-If there are multiple pipelines, report the list to the CEO agent and confirm which one to use before writing to Supabase.
+If this returns a 409 (property already exists), that is fine — skip it.
 
-Do not mark onboarding complete until all three connections return `"ACTIVE"`. If the client has not completed any step within 48 hours, resend the relevant URL.
+Do not mark onboarding complete until all four connections return `"ACTIVE"`. If the client has not completed any step within 48 hours, resend the relevant URL.
 
 ---
 
